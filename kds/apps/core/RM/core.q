@@ -1,6 +1,6 @@
 / RM
-.cfg.nodes:`node`hostname`ipaddress`tipe`port`region`ds`rack`amem`acpu`almem`alcpu`status!()
-.cfg.topics.`id`name`rf`region`ds`crtime`crby`msgpday`sttime`entime!()
+.cfg.nodes:flip `node`hostname`ipaddress`tipe`port`region`ds`rack`amem`acpu`almem`alcpu`status!()
+.cfg.topics:`id`name`rf`region`ds`crtime`crby`msgpday`sttime`entime!/:enlist (1;`tradetopic;3;`amrs;`scs;.z.p;`admin;1000000;00:00:00.000;23:59:59.000)
 .cfg.dir.work
 .cfg.dir.tmp
 .cfg.dir.log
@@ -24,49 +24,50 @@ startNode each exec !'[-1;`$ip,'":",'port] from .cfg.nodes where tipe = `forward
 sendLibs:{
 
 
-/
-init:{.stream.subs:t!(count t)#t:(exec distinct name from .cfg.topics)}
+/sendlib needs to be checked
 
-.stream.datain:{[t;d] d:.z.p,'$[0h~type first d;d;enlist d];
- pub[t;d]
-};
+.str.init:{t:(exec distinct name from .cfg.topics);.str.subs:t!(count t)#();}
 
-sub:{ addsub[;y] each $[x~`;key .stream.subs;x]};
+.str.datain:{[t;d] d:.z.p,'$[0h~type first d;d;enlist d];
+ .str.pub[t;d] };
 
-addsub:{ 
- $[(count .stream.subs)>i:.stream.subs[x;;0]?.z.w;
-  .[`.stream.subs;(x;i;1);union;y]; 
- .stream.subs[x]:enlist(.z.w;y] / no restriction on topic list
+.str.sub:{ .str.addsub[;y] each $[x~`;key .str.subs;x]};
+.str.init[]
+.str.subs[`tradetopic;0;1]
+.str.addsub:{ 
+   $[(count .str.subs[x])<i:.str.subs[x;;0]?.z.w;
+  / .[`.str.subs;(x;i;1);union;y];
+   .str.subs[x;i;1],:y;
+ .str.subs[x],:enlist(.z.w;y) / no restriction on topic list
   ];};
 
-delsub:{.stream.subs[x]_:.stream.subs[x;;0]?.z.w};
-.z.pc:{if[.z.w in raze .stream.subs[;;0]; delsub each key .stream.subs;
-update et:.z.p from `cfg.sysconn where host=h;h=.z.w;et=0Np;}
+.str.delsub:{.str.subs[x]_:.str.subs[x;;0]?y};
 
-pub:{if[not x in key .stream.subs;:()];
- {(neg z)(`datain;x;y)}[x;y;] each .stream.subs[x;;0]; }
+.z.pc:{if[x in raze value .str.subs[;;0]; .str.delsub[;x] each key .str.subs];update et:.z.p from `.cfg.sysconn where h=x, et=0Np;}
+
+.str.pub:{if[not x in key .str.subs;:()];
+ {(neg z)(`datain;x;y)}[x;y;] each .str.subs[x;;0]; }
  
-/
 
 / system init
-.cfg.proc.tipe:
+.cfg.proc.tipe:`broker;
 
 
 
 / connection lib
-.cfg.sysconn:`host`ipa`h`st`et!()
-
+.cfg.sysconn:flip `host`ipa`h`st`et!()
+.cfg.sysuser:`admin;
 sysconnect:{
- h:
- ip:
- u:
+ h:.z.h;
+ ip:.z.h;
+ u:`admin;
  $[(.cfg.proc.tipe=`broker)|
- (0<count exec i from .cfg.nodes where host=h, ipa=ip, u=.cfg.sysuser);
- [connupdate[];:1b]; 0b]
+ (0<count exec i from .cfg.nodes where hostname=h, ipaddress=ip ); / , u=.cfg.sysuser);
+ [connupdate[h;ip];:1b]; 0b]
 }
-
-connupdate:{insert[`.cfg.sysconn;(h;ip;.z.w;.z.p;0Np)];}
+sysconnect[]
+connupdate:{[h;ip] insert[`.cfg.sysconn;(h;ip;.z.w;.z.p;0Np)];}
 
 .z.po:{sysconnect[];}
-.z.pc:{update et:.z.p from `cfg.sysconn where host=h;h=.z.w;et=0Np;}
+.z.pc:{update et:.z.p from `.cfg.sysconn where h=.z.w,et=0Np;}
 /
